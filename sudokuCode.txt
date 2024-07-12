@@ -1,0 +1,206 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Random;
+
+public class SudokuSolverWithVisualization extends JFrame {
+    private static final int SIZE = 9;
+    private JTextField[][] cells;
+    private int delay = 100; // Delay for visualization
+    private Random random = new Random();
+
+    public SudokuSolverWithVisualization() {
+        setTitle("Sudoku Solver with Visualization");
+        setSize(600, 600);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        JPanel boardPanel = new JPanel(new GridLayout(SIZE, SIZE));
+        cells = new JTextField[SIZE][SIZE];
+        for (int i = 0; i < SIZE; i++) {
+            for (int j = 0; j < SIZE; j++) {
+                cells[i][j] = new JTextField();
+                cells[i][j].setHorizontalAlignment(JTextField.CENTER);
+                cells[i][j].setFont(new Font("Arial", Font.BOLD, 20));
+                cells[i][j].setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                boardPanel.add(cells[i][j]);
+            }
+        }
+
+        JButton solveButton = new JButton("Solve");
+        solveButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                int[][] board = new int[SIZE][SIZE];
+                for (int i = 0; i < SIZE; i++) {
+                    for (int j = 0; j < SIZE; j++) {
+                        String text = cells[i][j].getText();
+                        if (!text.isEmpty()) {
+                            board[i][j] = Integer.parseInt(text);
+                        } else {
+                            board[i][j] = 0;
+                        }
+                    }
+                }
+                new Thread(() -> {
+                    if (solveSudoku(board, 0, 0)) {
+                        updateBoard(board);
+                    } else {
+                        JOptionPane.showMessageDialog(SudokuSolverWithVisualization.this, "No solution exists", "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }).start();
+            }
+        });
+
+        JButton generateButton = new JButton("Generate");
+        generateButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                generateSudoku();
+            }
+        });
+
+        JSlider speedSlider = new JSlider(0, 1000, delay);
+        speedSlider.setMajorTickSpacing(200);
+        speedSlider.setPaintTicks(true);
+        speedSlider.setPaintLabels(true);
+        speedSlider.addChangeListener(e -> delay = speedSlider.getValue());
+
+        JPanel controlPanel = new JPanel();
+        controlPanel.add(new JLabel("Speed:"));
+        controlPanel.add(speedSlider);
+        controlPanel.add(solveButton);
+        controlPanel.add(generateButton);
+
+        add(boardPanel, BorderLayout.CENTER);
+        add(controlPanel, BorderLayout.SOUTH);
+    }
+
+    private boolean solveSudoku(int[][] board, int row, int col) {
+        if (row == SIZE - 1 && col == SIZE) {
+            return true;
+        }
+        if (col == SIZE) {
+            row++;
+            col = 0;
+        }
+        if (board[row][col] != 0) {
+            return solveSudoku(board, row, col + 1);
+        }
+        for (int num = 1; num <= SIZE; num++) {
+            if (isValid(board, row, col, num)) {
+                board[row][col] = num;
+                updateCell(row, col, num, Color.GREEN);
+                sleep(delay);
+                if (solveSudoku(board, row, col + 1)) {
+                    return true;
+                }
+                board[row][col] = 0;
+                updateCell(row, col, 0, Color.RED);
+                sleep(delay);
+            }
+        }
+        return false;
+    }
+
+    private boolean isValid(int[][] board, int row, int col, int num) {
+        for (int x = 0; x < SIZE; x++) {
+            if (board[row][x] == num || board[x][col] == num) {
+                return false;
+            }
+        }
+        int sqrt = (int) Math.sqrt(SIZE);
+        int boxRowStart = row - row % sqrt;
+        int boxColStart = col - col % sqrt;
+        for (int r = boxRowStart; r < boxRowStart + sqrt; r++) {
+            for (int d = boxColStart; d < boxColStart + sqrt; d++) {
+                if (board[r][d] == num) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void updateBoard(int[][] board) {
+        SwingUtilities.invokeLater(() -> {
+            for (int i = 0; i < SIZE; i++) {
+                for (int j = 0; j < SIZE; j++) {
+                    cells[i][j].setText(board[i][j] != 0 ? String.valueOf(board[i][j]) : "");
+                    cells[i][j].setBackground(Color.WHITE);
+                }
+            }
+        });
+    }
+
+    private void updateCell(int row, int col, int num, Color color) {
+        SwingUtilities.invokeLater(() -> {
+            cells[row][col].setText(num != 0 ? String.valueOf(num) : "");
+            cells[row][col].setBackground(color);
+        });
+    }
+
+    private void sleep(int delay) {
+        try {
+            Thread.sleep(delay);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void generateSudoku() {
+        int[][] board = new int[SIZE][SIZE];
+        fillDiagonal(board);
+        solveSudoku(board, 0, 0);
+        removeDigits(board);
+        updateBoard(board);
+    }
+
+    private void fillDiagonal(int[][] board) {
+        int sqrt = (int) Math.sqrt(SIZE);
+        for (int i = 0; i < SIZE; i += sqrt) {
+            fillBox(board, i, i);
+        }
+    }
+
+    private void fillBox(int[][] board, int row, int col) {
+        int num;
+        for (int i = 0; i < (int) Math.sqrt(SIZE); i++) {
+            for (int j = 0; j < (int) Math.sqrt(SIZE); j++) {
+                do {
+                    num = random.nextInt(SIZE) + 1;
+                } while (!isSafeInBox(board, row, col, num));
+                board[row + i][col + j] = num;
+            }
+        }
+    }
+
+    private boolean isSafeInBox(int[][] board, int row, int col, int num) {
+        for (int i = 0; i < (int) Math.sqrt(SIZE); i++) {
+            for (int j = 0; j < (int) Math.sqrt(SIZE); j++) {
+                if (board[row + i][col + j] == num) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private void removeDigits(int[][] board) {
+        int count = random.nextInt(20) + 40; // Randomly remove between 40 and 60 digits
+        while (count != 0) {
+            int cellId = random.nextInt(SIZE * SIZE);
+            int row = cellId / SIZE;
+            int col = cellId % SIZE;
+            if (board[row][col] != 0) {
+                board[row][col] = 0;
+                count--;
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new SudokuSolverWithVisualization().setVisible(true));
+    }
+}
